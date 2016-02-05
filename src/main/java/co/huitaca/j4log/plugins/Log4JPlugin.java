@@ -15,6 +15,7 @@
  */
 package co.huitaca.j4log.plugins;
 
+import java.security.ProtectionDomain;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -109,7 +110,8 @@ public class Log4JPlugin extends J4LogPlugin {
 	@Override
 	public LogLevel getLevel(String logger) {
 
-		LogLevel result = getClassLoaderLoggerLevel(logger, getClass().getClassLoader());
+		LogLevel result = getClassLoaderLoggerLevel(logger, getClass()
+				.getClassLoader());
 		for (ClassLoader classLoader : log4jManagerClassLoaders) {
 			LogLevel level = getClassLoaderLoggerLevel(logger, classLoader);
 			if (level != null && result != null && !level.equals(result)) {
@@ -136,12 +138,14 @@ public class Log4JPlugin extends J4LogPlugin {
 	}
 
 	@Override
-	public void classLoaded(String className, ClassLoader classLoader) {
+	public byte[] classLoaded(String className, ClassLoader classLoader,
+			ProtectionDomain protectionDomain, byte[] classfileBuffer) {
 
 		if (LOG4J_LOG_MANAGER.equals(className)) {
 			log4jManagerClassLoaders.add(classLoader);
 		}
 
+		return null;
 	}
 
 	private Map<String, LogLevel> getClassLoaderLoggers(ClassLoader classLoader) {
@@ -149,9 +153,11 @@ public class Log4JPlugin extends J4LogPlugin {
 		Map<String, LogLevel> loggers = new TreeMap<String, LogLevel>();
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
+					false, classLoader);
 			Enumeration<?> loggersEnum = (Enumeration<?>) log4jManagerClass
-					.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS, (Class<?>[]) null).invoke(null, (Object[]) null);
+					.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS,
+							(Class<?>[]) null).invoke(null, (Object[]) null);
 
 			if (loggersEnum == null) {
 				return loggers;
@@ -159,9 +165,11 @@ public class Log4JPlugin extends J4LogPlugin {
 
 			while (loggersEnum.hasMoreElements()) {
 				Object logger = loggersEnum.nextElement();
-				String name = (String) logger.getClass().getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
+				String name = (String) logger.getClass()
+						.getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
-				Object levelObject = logger.getClass().getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
+				Object levelObject = logger.getClass()
+						.getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
 				loggers.put(name, mapLevel(levelObject));
 			}
@@ -172,20 +180,24 @@ public class Log4JPlugin extends J4LogPlugin {
 		return loggers;
 	}
 
-	private LogLevel getClassLoaderLoggerLevel(String loggerName, ClassLoader classLoader) {
+	private LogLevel getClassLoaderLoggerLevel(String loggerName,
+			ClassLoader classLoader) {
 
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
-			Object logger = log4jManagerClass.getMethod(LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
+					false, classLoader);
+			Object logger = log4jManagerClass.getMethod(
+					LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
 					.invoke(null, new Object[] { loggerName });
 
 			if (logger == null) {
 				return null;
 			}
 
-			Object levelObject = logger.getClass().getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null).invoke(logger,
-					(Object[]) null);
+			Object levelObject = logger.getClass()
+					.getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
+					.invoke(logger, (Object[]) null);
 
 			return mapLevel(levelObject);
 
@@ -195,13 +207,17 @@ public class Log4JPlugin extends J4LogPlugin {
 
 	}
 
-	private void setClassLoaderLoggerLevel(String loggerName, LogLevel j4logLevel, ClassLoader classLoader) {
+	private void setClassLoaderLoggerLevel(String loggerName,
+			LogLevel j4logLevel, ClassLoader classLoader) {
 
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
-			Class<?> log4jLevelClass = Class.forName(LOG4J_LEVEL, false, classLoader);
-			Object logger = log4jManagerClass.getMethod(LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
+					false, classLoader);
+			Class<?> log4jLevelClass = Class.forName(LOG4J_LEVEL, false,
+					classLoader);
+			Object logger = log4jManagerClass.getMethod(
+					LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
 					.invoke(null, new Object[] { loggerName });
 
 			if (logger == null) {
@@ -212,10 +228,13 @@ public class Log4JPlugin extends J4LogPlugin {
 			if (log4jLevelName == null) {
 				return;
 			}
-			Object log4jLevel = log4jLevelClass.getMethod(LOG4J_LEVEL_TO_LEVEL, new Class<?>[] { String.class })
-					.invoke(null, new Object[] { log4jLevelName });
-			logger.getClass().getMethod(LOG4J_LOGGER_SET_LEVEL, new Class<?>[] { log4jLevelClass }).invoke(logger,
-					new Object[] { log4jLevel });
+			Object log4jLevel = log4jLevelClass.getMethod(LOG4J_LEVEL_TO_LEVEL,
+					new Class<?>[] { String.class }).invoke(null,
+					new Object[] { log4jLevelName });
+			logger.getClass()
+					.getMethod(LOG4J_LOGGER_SET_LEVEL,
+							new Class<?>[] { log4jLevelClass })
+					.invoke(logger, new Object[] { log4jLevel });
 
 		} catch (Exception e) {
 		}
@@ -224,8 +243,8 @@ public class Log4JPlugin extends J4LogPlugin {
 
 	private LogLevel mapLevel(Object log4jLevel) {
 
-		return log4jLevel == null ? LogLevel.INDETERMINATE
-				: LOG4J_LEVELS_MAP.get(log4jLevel.toString().trim().toUpperCase());
+		return log4jLevel == null ? LogLevel.INDETERMINATE : LOG4J_LEVELS_MAP
+				.get(log4jLevel.toString().trim().toUpperCase());
 	}
 
 	private String mapLevel(LogLevel j4logLevel) {

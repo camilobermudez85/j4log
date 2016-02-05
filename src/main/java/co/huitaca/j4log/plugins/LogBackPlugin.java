@@ -16,6 +16,7 @@
 package co.huitaca.j4log.plugins;
 
 import java.lang.reflect.InvocationTargetException;
+import java.security.ProtectionDomain;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -106,33 +107,36 @@ public class LogBackPlugin extends J4LogPlugin {
 	}
 
 	@Override
-	public void classLoaded(String className, ClassLoader classLoader) {
-
-		if (LOG4J_LOG_MANAGER.equals(className)) {
-			log4jManagerClassLoaders.add(classLoader);
-		}
+	public byte[] classLoaded(String className, ClassLoader classLoader,
+			ProtectionDomain protectionDomain, byte[] classfileBuffer) {
 
 		if (LOGBACK_LOGGER_CONTEXT.equals(className)) {
 			logbackContextClassLoaders.add(classLoader);
 		}
 
+		return null;
 	}
 
 	private Map<String, LogLevel> getClassLoaderLoggers(ClassLoader classLoader)
-			throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
+			throws NoSuchMethodException, SecurityException,
+			IllegalAccessException, IllegalArgumentException,
 			InvocationTargetException, ClassNotFoundException {
 
-		Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
+		Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false,
+				classLoader);
 		Map<String, LogLevel> loggers = new HashMap<String, LogLevel>();
 		Enumeration<?> loggersEnum = (Enumeration<?>) log4jManagerClass
-				.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS, (Class<?>[]) null).invoke(null, (Object[]) null);
+				.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS,
+						(Class<?>[]) null).invoke(null, (Object[]) null);
 
 		if (loggers != null) {
 			while (loggersEnum.hasMoreElements()) {
 				Object logger = loggersEnum.nextElement();
-				String name = (String) logger.getClass().getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
+				String name = (String) logger.getClass()
+						.getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
-				Object levelObject = logger.getClass().getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
+				Object levelObject = logger.getClass()
+						.getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
 				loggers.put(name, mapLevel(levelObject));
 			}
@@ -143,7 +147,7 @@ public class LogBackPlugin extends J4LogPlugin {
 
 	private LogLevel mapLevel(Object log4jLevel) {
 
-		return log4jLevel == null ? LogLevel.INDETERMINATE
-				: LOGBACK_LEVELS.get(log4jLevel.toString().trim().toUpperCase());
+		return log4jLevel == null ? LogLevel.INDETERMINATE : LOGBACK_LEVELS
+				.get(log4jLevel.toString().trim().toUpperCase());
 	}
 }

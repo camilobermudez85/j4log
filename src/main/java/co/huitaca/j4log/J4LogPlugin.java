@@ -15,6 +15,7 @@
  */
 package co.huitaca.j4log;
 
+import java.security.ProtectionDomain;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -58,9 +59,12 @@ public abstract class J4LogPlugin {
 	 * @param className
 	 * @param classLoader
 	 */
-	public abstract void classLoaded(String className, ClassLoader classLoader);
+	public abstract byte[] classLoaded(String className,
+			ClassLoader classLoader, ProtectionDomain protectionDomain,
+			byte[] classfileBuffer);
 
-	protected Map<String, LogLevel> filterLike(Map<String, LogLevel> input, String like) {
+	protected Map<String, LogLevel> filterLike(Map<String, LogLevel> input,
+			String like) {
 
 		if (like == null || "".equals(like.trim())) {
 			return input;
