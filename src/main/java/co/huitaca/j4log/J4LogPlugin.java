@@ -1,6 +1,8 @@
 package co.huitaca.j4log;
 
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 
 public abstract class J4LogPlugin {
 
@@ -43,4 +45,19 @@ public abstract class J4LogPlugin {
 	 */
 	public abstract void classLoaded(String className, ClassLoader classLoader);
 
+	protected Map<String, LogLevel> filterLike(Map<String, LogLevel> input, String like) {
+
+		if (like == null || "".equals(like.trim())) {
+			return input;
+		}
+
+		Map<String, LogLevel> filtered = new TreeMap<>();
+		for (Entry<String, LogLevel> entry : input.entrySet()) {
+			if (entry.getKey().toLowerCase().contains(like.toLowerCase())) {
+				filtered.put(entry.getKey(), entry.getValue());
+			}
+		}
+
+		return filtered;
+	}
 }
