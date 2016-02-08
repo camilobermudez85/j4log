@@ -24,11 +24,18 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
 
+import javassist.ClassPool;
+import javassist.CtBehavior;
+import javassist.CtClass;
+import javassist.CtField;
 import co.huitaca.j4log.J4LogPlugin;
 import co.huitaca.j4log.LogLevel;
 
 public class Log4JPlugin extends J4LogPlugin {
 
+	private static final String CONSOLE_APPENDER_LAYOUT = "";
+
+	private static final String LOG4J_LOGGER = "org.apache.log4j.Logger";
 	private static final String LOG4J_LOG_MANAGER = "org.apache.log4j.LogManager";
 	private static final String LOG4J_LEVEL = "org.apache.log4j.Level";
 	private static final String LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS = "getCurrentLoggers";
@@ -37,6 +44,10 @@ public class Log4JPlugin extends J4LogPlugin {
 	private static final String LOG4J_LOGGER_GET_LEVEL = "getLevel";
 	private static final String LOG4J_LOGGER_SET_LEVEL = "setLevel";
 	private static final String LOG4J_LEVEL_TO_LEVEL = "toLevel";
+	private static final String LOG4J_CONSOLE_APPENDER = "org.apache.log4j.ConsoleAppender";
+	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_DEF = "private static org.apache.log4j.ConsoleAppender _consoleAppender;";
+	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_INIT = "new org.apache.log4j.ConsoleAppender(new org.apache.log4j.PatternLayout(\""
+			+ CONSOLE_APPENDER_LAYOUT + "\"));";
 
 	private static final Map<String, LogLevel> LOG4J_LEVELS_MAP;
 	private static final Map<LogLevel, String> J4LOG_LEVELS_MAP;
@@ -143,9 +154,77 @@ public class Log4JPlugin extends J4LogPlugin {
 
 		if (LOG4J_LOG_MANAGER.equals(className)) {
 			log4jManagerClassLoaders.add(classLoader);
+			return null;
 		}
 
+		if (LOG4J_LOGGER.equals(className)) {
+//			ClassPool pool = ClassPool.getDefault();
+//			CtClass cl = null;
+//
+//			try {
+//				cl = pool.makeClass(new java.io.ByteArrayInputStream(b));
+//
+//				if (cl.isInterface() == false) {
+//
+//					CtField field = CtField.make(
+//							LOG4J_CONSOLE_APPENDER_INSTANCE_DEF, cl);
+//					String getLogger = "java.util.logging.Logger.getLogger("
+//							+ name.replace('/', '.') + ".class.getName());";
+//					cl.addField(field, getLogger);
+//
+//					CtBehavior[] methods = cl.getDeclaredBehaviors();
+//
+//					for (int i = 0; i < methods.length; i++) {
+//
+//						if (methods[i].isEmpty() == false) {
+//							doMethod(methods[i]);
+//						}
+//					}
+//
+//					classfileBuffer = cl.toBytecode();
+//				}
+//			} catch (Exception e) {
+//				System.err.println("Could not instrument  " + name
+//						+ ",  exception : " + e.getMessage());
+//			} finally {
+//
+//				if (cl != null) {
+//					cl.detach();
+//				}
+//			}
+//
+//			return classfileBuffer;
+		}
+		
 		return null;
+	}
+
+	private byte[] addConsoleAppenderField(ClassLoader classLoader,
+			byte[] bytecode) {
+
+		ClassPool pool = ClassPool.getDefault();
+		CtClass cl = null;
+
+		try {
+
+			cl = pool.makeClass(new java.io.ByteArrayInputStream(bytecode));
+			CtField field = CtField.make(LOG4J_CONSOLE_APPENDER_INSTANCE_DEF,
+					cl);
+			cl.addField(field, LOG4J_CONSOLE_APPENDER_INSTANCE_INIT);
+
+			return cl.toBytecode();
+
+		} catch (Exception e) {
+//			System.err.println("Could not instrument  " + name
+//					+ ",  exception : " + e.getMessage());
+		} finally {
+			if (cl != null) {
+				cl.detach();
+			}
+		}
+
+		return bytecode;
+
 	}
 
 	private Map<String, LogLevel> getClassLoaderLoggers(ClassLoader classLoader) {
