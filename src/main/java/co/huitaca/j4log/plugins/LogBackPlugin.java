@@ -101,13 +101,13 @@ public class LogBackPlugin extends J4LogPlugin {
 	}
 
 	@Override
-	public String[] notifyOnClassLoading() {
+	public String[] getObservedClasses() {
 
 		return new String[] { LOG4J_LOG_MANAGER, LOGBACK_LOGGER_CONTEXT };
 	}
 
 	@Override
-	public byte[] classLoaded(String className, ClassLoader classLoader,
+	public byte[] onClassLoaded(String className, ClassLoader classLoader,
 			ProtectionDomain protectionDomain, byte[] classfileBuffer) {
 
 		if (LOGBACK_LOGGER_CONTEXT.equals(className)) {

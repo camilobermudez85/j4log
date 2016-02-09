@@ -23,17 +23,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import javassist.ClassPool;
-import javassist.CtBehavior;
-import javassist.CtClass;
-import javassist.CtField;
 import co.huitaca.j4log.J4LogPlugin;
 import co.huitaca.j4log.LogLevel;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtConstructor;
+import javassist.CtField;
 
 public class Log4JPlugin extends J4LogPlugin {
 
-	private static final String CONSOLE_APPENDER_LAYOUT = "";
+	private static final Logger LOGGER = Logger.getLogger(Log4JPlugin.class.getName());
+
+	private static final String CONSOLE_APPENDER_LAYOUT_PATTERN = "";
 
 	private static final String LOG4J_LOGGER = "org.apache.log4j.Logger";
 	private static final String LOG4J_LOG_MANAGER = "org.apache.log4j.LogManager";
@@ -45,12 +49,18 @@ public class Log4JPlugin extends J4LogPlugin {
 	private static final String LOG4J_LOGGER_SET_LEVEL = "setLevel";
 	private static final String LOG4J_LEVEL_TO_LEVEL = "toLevel";
 	private static final String LOG4J_CONSOLE_APPENDER = "org.apache.log4j.ConsoleAppender";
-	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_DEF = "private static org.apache.log4j.ConsoleAppender _consoleAppender;";
-	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_INIT = "new org.apache.log4j.ConsoleAppender(new org.apache.log4j.PatternLayout(\""
-			+ CONSOLE_APPENDER_LAYOUT + "\"));";
 
 	private static final Map<String, LogLevel> LOG4J_LEVELS_MAP;
 	private static final Map<LogLevel, String> J4LOG_LEVELS_MAP;
+
+	/*
+	 * Transformations source code
+	 */
+	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_DEF = "private static " + LOG4J_CONSOLE_APPENDER
+			+ " _consoleAppender;";
+	private static final String LOG4J_CONSOLE_APPENDER_INSTANCE_INIT = "new " + LOG4J_CONSOLE_APPENDER
+			+ " (new org.apache.log4j.PatternLayout(\"" + CONSOLE_APPENDER_LAYOUT_PATTERN + "\"));";
+	private static final String LOG4J_ADD_CONSOLE_APPENDER_SRC = "addAppender(_consoleAppender);";
 
 	static {
 
@@ -121,8 +131,7 @@ public class Log4JPlugin extends J4LogPlugin {
 	@Override
 	public LogLevel getLevel(String logger) {
 
-		LogLevel result = getClassLoaderLoggerLevel(logger, getClass()
-				.getClassLoader());
+		LogLevel result = getClassLoaderLoggerLevel(logger, getClass().getClassLoader());
 		for (ClassLoader classLoader : log4jManagerClassLoaders) {
 			LogLevel level = getClassLoaderLoggerLevel(logger, classLoader);
 			if (level != null && result != null && !level.equals(result)) {
@@ -143,87 +152,58 @@ public class Log4JPlugin extends J4LogPlugin {
 	}
 
 	@Override
-	public String[] notifyOnClassLoading() {
+	public String[] getObservedClasses() {
 
-		return new String[] { LOG4J_LOG_MANAGER };
+		return new String[] { LOG4J_LOG_MANAGER, LOG4J_LOGGER };
 	}
 
 	@Override
-	public byte[] classLoaded(String className, ClassLoader classLoader,
-			ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+	public byte[] onClassLoaded(String className, ClassLoader classLoader, ProtectionDomain protectionDomain,
+			byte[] classfileBuffer) {
 
 		if (LOG4J_LOG_MANAGER.equals(className)) {
+			LOGGER.log(Level.INFO, "Log4j LogManager detected in ClassLoader: " + classLoader);
 			log4jManagerClassLoaders.add(classLoader);
 			return null;
 		}
 
 		if (LOG4J_LOGGER.equals(className)) {
-//			ClassPool pool = ClassPool.getDefault();
-//			CtClass cl = null;
-//
-//			try {
-//				cl = pool.makeClass(new java.io.ByteArrayInputStream(b));
-//
-//				if (cl.isInterface() == false) {
-//
-//					CtField field = CtField.make(
-//							LOG4J_CONSOLE_APPENDER_INSTANCE_DEF, cl);
-//					String getLogger = "java.util.logging.Logger.getLogger("
-//							+ name.replace('/', '.') + ".class.getName());";
-//					cl.addField(field, getLogger);
-//
-//					CtBehavior[] methods = cl.getDeclaredBehaviors();
-//
-//					for (int i = 0; i < methods.length; i++) {
-//
-//						if (methods[i].isEmpty() == false) {
-//							doMethod(methods[i]);
-//						}
-//					}
-//
-//					classfileBuffer = cl.toBytecode();
-//				}
-//			} catch (Exception e) {
-//				System.err.println("Could not instrument  " + name
-//						+ ",  exception : " + e.getMessage());
-//			} finally {
-//
-//				if (cl != null) {
-//					cl.detach();
-//				}
-//			}
-//
-//			return classfileBuffer;
+			LOGGER.log(Level.INFO, "Transforming log4j Logger class in Classloader: " + classLoader);
+			return addConsoleAppenderTransformation(classLoader, classfileBuffer);
 		}
-		
+
 		return null;
 	}
 
-	private byte[] addConsoleAppenderField(ClassLoader classLoader,
-			byte[] bytecode) {
+	private byte[] addConsoleAppenderTransformation(ClassLoader classLoader, byte[] classfileBuffer) {
 
 		ClassPool pool = ClassPool.getDefault();
 		CtClass cl = null;
 
 		try {
 
-			cl = pool.makeClass(new java.io.ByteArrayInputStream(bytecode));
-			CtField field = CtField.make(LOG4J_CONSOLE_APPENDER_INSTANCE_DEF,
-					cl);
+			// Add console appender field
+			cl = pool.makeClass(new java.io.ByteArrayInputStream(classfileBuffer));
+			CtField field = CtField.make(LOG4J_CONSOLE_APPENDER_INSTANCE_DEF, cl);
 			cl.addField(field, LOG4J_CONSOLE_APPENDER_INSTANCE_INIT);
+
+			// Add appender after every declared constructor
+			CtConstructor[] constructors = cl.getDeclaredConstructors();
+			for (CtConstructor constructor : constructors) {
+				constructor.insertAfter(LOG4J_ADD_CONSOLE_APPENDER_SRC);
+			}
 
 			return cl.toBytecode();
 
 		} catch (Exception e) {
-//			System.err.println("Could not instrument  " + name
-//					+ ",  exception : " + e.getMessage());
+			LOGGER.log(Level.WARNING, "Error adding console appender transformation.", e);
 		} finally {
 			if (cl != null) {
 				cl.detach();
 			}
 		}
 
-		return bytecode;
+		return null;
 
 	}
 
@@ -232,11 +212,9 @@ public class Log4JPlugin extends J4LogPlugin {
 		Map<String, LogLevel> loggers = new TreeMap<String, LogLevel>();
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
-					false, classLoader);
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
 			Enumeration<?> loggersEnum = (Enumeration<?>) log4jManagerClass
-					.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS,
-							(Class<?>[]) null).invoke(null, (Object[]) null);
+					.getMethod(LOG4J_LOG_MANAGER_GET_CURRENT_LOGGERS, (Class<?>[]) null).invoke(null, (Object[]) null);
 
 			if (loggersEnum == null) {
 				return loggers;
@@ -244,11 +222,9 @@ public class Log4JPlugin extends J4LogPlugin {
 
 			while (loggersEnum.hasMoreElements()) {
 				Object logger = loggersEnum.nextElement();
-				String name = (String) logger.getClass()
-						.getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
+				String name = (String) logger.getClass().getMethod(LOG4J_LOGGER_GET_NAME, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
-				Object levelObject = logger.getClass()
-						.getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
+				Object levelObject = logger.getClass().getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
 						.invoke(logger, (Object[]) null);
 				loggers.put(name, mapLevel(levelObject));
 			}
@@ -259,24 +235,20 @@ public class Log4JPlugin extends J4LogPlugin {
 		return loggers;
 	}
 
-	private LogLevel getClassLoaderLoggerLevel(String loggerName,
-			ClassLoader classLoader) {
+	private LogLevel getClassLoaderLoggerLevel(String loggerName, ClassLoader classLoader) {
 
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
-					false, classLoader);
-			Object logger = log4jManagerClass.getMethod(
-					LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
+			Object logger = log4jManagerClass.getMethod(LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
 					.invoke(null, new Object[] { loggerName });
 
 			if (logger == null) {
 				return null;
 			}
 
-			Object levelObject = logger.getClass()
-					.getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null)
-					.invoke(logger, (Object[]) null);
+			Object levelObject = logger.getClass().getMethod(LOG4J_LOGGER_GET_LEVEL, (Class<?>[]) null).invoke(logger,
+					(Object[]) null);
 
 			return mapLevel(levelObject);
 
@@ -286,17 +258,13 @@ public class Log4JPlugin extends J4LogPlugin {
 
 	}
 
-	private void setClassLoaderLoggerLevel(String loggerName,
-			LogLevel j4logLevel, ClassLoader classLoader) {
+	private void setClassLoaderLoggerLevel(String loggerName, LogLevel j4logLevel, ClassLoader classLoader) {
 
 		try {
 
-			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER,
-					false, classLoader);
-			Class<?> log4jLevelClass = Class.forName(LOG4J_LEVEL, false,
-					classLoader);
-			Object logger = log4jManagerClass.getMethod(
-					LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
+			Class<?> log4jManagerClass = Class.forName(LOG4J_LOG_MANAGER, false, classLoader);
+			Class<?> log4jLevelClass = Class.forName(LOG4J_LEVEL, false, classLoader);
+			Object logger = log4jManagerClass.getMethod(LOG4J_LOG_MANAGER_GET_LOGGER, new Class[] { String.class })
 					.invoke(null, new Object[] { loggerName });
 
 			if (logger == null) {
@@ -307,13 +275,10 @@ public class Log4JPlugin extends J4LogPlugin {
 			if (log4jLevelName == null) {
 				return;
 			}
-			Object log4jLevel = log4jLevelClass.getMethod(LOG4J_LEVEL_TO_LEVEL,
-					new Class<?>[] { String.class }).invoke(null,
-					new Object[] { log4jLevelName });
-			logger.getClass()
-					.getMethod(LOG4J_LOGGER_SET_LEVEL,
-							new Class<?>[] { log4jLevelClass })
-					.invoke(logger, new Object[] { log4jLevel });
+			Object log4jLevel = log4jLevelClass.getMethod(LOG4J_LEVEL_TO_LEVEL, new Class<?>[] { String.class })
+					.invoke(null, new Object[] { log4jLevelName });
+			logger.getClass().getMethod(LOG4J_LOGGER_SET_LEVEL, new Class<?>[] { log4jLevelClass }).invoke(logger,
+					new Object[] { log4jLevel });
 
 		} catch (Exception e) {
 		}
@@ -322,8 +287,8 @@ public class Log4JPlugin extends J4LogPlugin {
 
 	private LogLevel mapLevel(Object log4jLevel) {
 
-		return log4jLevel == null ? LogLevel.INDETERMINATE : LOG4J_LEVELS_MAP
-				.get(log4jLevel.toString().trim().toUpperCase());
+		return log4jLevel == null ? LogLevel.INDETERMINATE
+				: LOG4J_LEVELS_MAP.get(log4jLevel.toString().trim().toUpperCase());
 	}
 
 	private String mapLevel(LogLevel j4logLevel) {

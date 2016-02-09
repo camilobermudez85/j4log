@@ -42,29 +42,27 @@ public abstract class J4LogPlugin {
 	 * The implementation should return the names of the classes it's interested
 	 * in. When any of the classes returned here gets loaded the plug-in
 	 * implementation will get notified on the method
-	 * {@link #classLoaded(String, ClassLoader)}.
+	 * {@link #onClassLoaded(String, ClassLoader, ProtectionDomain, byte[])}.
 	 * 
 	 * @return a list of classes fully qualified names, e.g.
 	 *         {"java.lang.List","java.lang.String"}
 	 */
-	public abstract String[] notifyOnClassLoading();
+	public abstract String[] getObservedClasses();
 
 	/**
 	 * *** ONLY USED IN AGENT MODE ***
 	 * 
 	 * Through this method, the implementation will get notified about the
 	 * loading events of any of the classes returned on
-	 * {@link #notifyOnClassLoading()}.
+	 * {@link #getObservedClasses()}.
 	 * 
 	 * @param className
 	 * @param classLoader
 	 */
-	public abstract byte[] classLoaded(String className,
-			ClassLoader classLoader, ProtectionDomain protectionDomain,
+	public abstract byte[] onClassLoaded(String className, ClassLoader classLoader, ProtectionDomain protectionDomain,
 			byte[] classfileBuffer);
 
-	protected Map<String, LogLevel> filterLike(Map<String, LogLevel> input,
-			String like) {
+	protected Map<String, LogLevel> filterLike(Map<String, LogLevel> input, String like) {
 
 		if (like == null || "".equals(like.trim())) {
 			return input;
