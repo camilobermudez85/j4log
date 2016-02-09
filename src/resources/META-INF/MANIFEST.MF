@@ -1,1 +1,0 @@
-Premain-Class: co.huitaca.j4log.J4LogAgent
