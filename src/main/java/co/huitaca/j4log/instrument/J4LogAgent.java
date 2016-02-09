@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import javassist.bytecode.Descriptor;
 
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.MBeanRegistrationException;
@@ -36,19 +36,18 @@ import javax.management.ObjectName;
 import co.huitaca.j4log.J4LogPlugin;
 import co.huitaca.j4log.jmx.J4Log;
 import co.huitaca.j4log.plugins.PluginManager;
-import javassist.bytecode.Descriptor;
 
 public class J4LogAgent {
 
-	private static final Logger LOGGER = Logger.getLogger(J4LogAgent.class.getName());
+//	private static final Logger LOGGER = Logger.getLogger(J4LogAgent.class.getName());
 
 	public static void premain(final String agentArgument, final Instrumentation instrumentation)
 			throws MalformedObjectNameException, InstanceAlreadyExistsException, MBeanRegistrationException,
 			NotCompliantMBeanException {
 
-		LOGGER.log(Level.INFO, "Activating j4Log agent.");
+		System.out.println("Activating j4Log agent.");
 		instrumentation.addTransformer(new Transformer(buildObservedClassesMap()), false);
-		LOGGER.log(Level.INFO, "Registering j4Log MBean with object name '" + J4Log.OBJECT_NAME + "'");
+		System.out.println("Registering j4Log MBean with object name '" + J4Log.OBJECT_NAME + "'");
 		ManagementFactory.getPlatformMBeanServer().registerMBean(J4Log.getInstance(),
 				new ObjectName(J4Log.OBJECT_NAME));
 
@@ -59,13 +58,13 @@ public class J4LogAgent {
 		Map<String, List<J4LogPlugin>> map = new HashMap<String, List<J4LogPlugin>>();
 		for (J4LogPlugin plugin : PluginManager.getPlugins()) {
 
-			LOGGER.log(Level.INFO, "Loading plugin " + plugin);
+			System.out.println("Loading plugin " + plugin);
 			for (String className : plugin.getObservedClasses()) {
 				if (className == null || "".equals(className.trim())) {
 					continue;
 				}
 				String jvmName = Descriptor.toJvmName(className);
-				LOGGER.log(Level.INFO, "Plugin " + plugin + " will observe class " + jvmName);
+				System.out.println("Plugin " + plugin + " will observe class " + jvmName);
 				if (map.containsKey(jvmName)) {
 					map.get(jvmName).add(plugin);
 				} else {
@@ -92,16 +91,23 @@ public class J4LogAgent {
 		public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
 				ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
 
+			System.out.println("transform: " + className);
 			List<J4LogPlugin> plugins = observedClassesMap.get(className);
 			if (plugins == null) {
 				return null;
 			}
 
-			LOGGER.log(Level.INFO,
-					"Class " + className + " loading detected. Plugins that will be notified: " + plugins);
+			System.out.println("Class abc " + className + " loading detected. Plugins that will be notified: " + plugins);
+			System.out.println("abc");
+			System.out.println("observedClassesMap: " + observedClassesMap);
+			System.out.println("******************************************");
+			System.out.println("Plugins: " + plugins);
+			System.out.println("observedClassesMap: " + observedClassesMap);
 			byte[] tempBuffer;
 			boolean transformedAtLeastOnce = false;
 			for (J4LogPlugin plugin : plugins) {
+				System.out.println("******************************* onClassLoaded: " + plugin);
+				System.out.println("observedClassesMap: " + observedClassesMap);
 				tempBuffer = plugin.onClassLoaded(Descriptor.toJavaName(className), loader, protectionDomain,
 						classfileBuffer);
 				if (tempBuffer != null) {

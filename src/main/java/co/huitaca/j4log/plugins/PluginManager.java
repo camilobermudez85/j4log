@@ -28,6 +28,7 @@ public class PluginManager {
 	static {
 		PLUGINS = new ArrayList<>();
 		PLUGINS.add(new Log4JPlugin());
+		PLUGINS.add(new JULPlugin());
 		PLUGINS = Collections.unmodifiableList(PLUGINS);
 
 	}
