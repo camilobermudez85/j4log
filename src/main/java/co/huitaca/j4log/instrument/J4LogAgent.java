@@ -48,6 +48,7 @@ public class J4LogAgent {
 		System.out.println("Activating j4Log agent.");
 		instrumentation.addTransformer(new Transformer(buildObservedClassesMap()), false);
 		System.out.println("Registering j4Log MBean with object name '" + J4Log.OBJECT_NAME + "'");
+		System.out.println(Thread.currentThread().getContextClassLoader());
 		ManagementFactory.getPlatformMBeanServer().registerMBean(J4Log.getInstance(),
 				new ObjectName(J4Log.OBJECT_NAME));
 
@@ -91,23 +92,16 @@ public class J4LogAgent {
 		public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
 				ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
 
-			System.out.println("transform: " + className);
 			List<J4LogPlugin> plugins = observedClassesMap.get(className);
 			if (plugins == null) {
 				return null;
 			}
 
-			System.out.println("Class abc " + className + " loading detected. Plugins that will be notified: " + plugins);
-			System.out.println("abc");
-			System.out.println("observedClassesMap: " + observedClassesMap);
-			System.out.println("******************************************");
-			System.out.println("Plugins: " + plugins);
+			System.out.println("Class " + className + " loading detected on class loader " + loader + ". Plugins that will be notified: " + plugins);
 			System.out.println("observedClassesMap: " + observedClassesMap);
 			byte[] tempBuffer;
 			boolean transformedAtLeastOnce = false;
 			for (J4LogPlugin plugin : plugins) {
-				System.out.println("******************************* onClassLoaded: " + plugin);
-				System.out.println("observedClassesMap: " + observedClassesMap);
 				tempBuffer = plugin.onClassLoaded(Descriptor.toJavaName(className), loader, protectionDomain,
 						classfileBuffer);
 				if (tempBuffer != null) {
