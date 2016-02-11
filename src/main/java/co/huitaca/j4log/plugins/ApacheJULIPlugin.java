@@ -16,68 +16,147 @@
 package co.huitaca.j4log.plugins;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.logging.Formatter;
 import java.util.logging.LogManager;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 
 public class ApacheJULIPlugin extends JULPlugin {
 
-	private static final String LOG_MANAGER_CLASSLOADER_LOGGERS_FIELD = "classLoaderLoggers";
-	private static final String APACHE_JULI_LOG_MANAGER_IMPL = "org.apache.juli.ClassLoaderLogManager";
-	private static final String CLASSLOADER_LOG_INFO_LOGGERS = "loggers";
+    private static final String LOG_MANAGER_CLASSLOADER_LOGGERS_FIELD = "classLoaderLoggers";
+    private static final String APACHE_JULI_LOG_MANAGER_IMPL = "org.apache.juli.ClassLoaderLogManager";
+    private static final String CLASSLOADER_LOG_INFO_LOGGERS = "loggers";
 
-	@Override
-	public Map<String, String> getLoggers() {
+    @Override
+    public Map<String, String> getLoggers() {
 
-		Map<String, String> result = new TreeMap<String, String>();
-		try {
+	Map<String, String> result = new TreeMap<String, String>();
+	try {
 
-			LogManager lm = LogManager.getLogManager();
-			Class<?> logManagerClass = lm.getClass();
+	    Map<String, Logger> loggers = getLoggerInstances();
+	    for (Entry<String, Logger> entry : loggers.entrySet()) {
+		result.put(entry.getKey(), mapLevel(getEffectiveLoggerLevel(entry.getValue())));
+	    }
 
-			// We're only interested in the Apache JULI implementation
-			if (!logManagerClass.getName().equals(APACHE_JULI_LOG_MANAGER_IMPL)) {
-				return result;
-			}
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
 
-			Field f = lm.getClass().getDeclaredField(
-					LOG_MANAGER_CLASSLOADER_LOGGERS_FIELD);
-			f.setAccessible(true);
-			Map<?, ?> classLoaderLoggers = (Map<?, ?>) f.get(lm);
-			if (classLoaderLoggers == null || classLoaderLoggers.size() == 0) {
-				return result;
-			}
+	return result;
+    }
 
-			Map<String, Logger> loggers = new HashMap<String, Logger>();
-			for (Entry<?, ?> entry : classLoaderLoggers.entrySet()) {
+    @Override
+    public void setLevel(String logger, String level) {
 
-				// Entry values should be instances of
-				// org.apache.juli.ClassLoaderLogManager$ClassLoaderLogInfo
-				Object classLoaderLogInfo = entry.getValue();
-				Field loggersField = classLoaderLogInfo.getClass()
-						.getDeclaredField(CLASSLOADER_LOG_INFO_LOGGERS);
-				loggersField.setAccessible(true);
+	try {
 
-				@SuppressWarnings("unchecked")
-				Map<String, Logger> classLoaderloggers = (Map<String, Logger>) loggersField
-						.get(classLoaderLogInfo);
-				if (classLoaderLoggers != null) {
-					loggers.putAll(classLoaderloggers);
-				}
-			}
+	    Map<String, Logger> loggers = getLoggerInstances();
+	    for (Entry<String, Logger> entry : loggers.entrySet()) {
+		if (entry.getKey().equals(logger)) {
+		    entry.getValue().setLevel(mapLevel(level));
+		    return;
+		}
+	    }
 
-			for (Entry<String, Logger> entry : loggers.entrySet()) {
-				result.put(entry.getKey(),
-						mapLevel(entry.getValue().getLevel()));
-			}
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
 
-		} catch (Exception e) {
-			e.printStackTrace();
+    }
+
+    @Override
+    public String getLevel(String logger) {
+
+	try {
+
+	    Map<String, Logger> loggers = getLoggerInstances();
+	    for (Entry<String, Logger> entry : loggers.entrySet()) {
+		if (entry.getKey().equals(logger)) {
+		    return mapLevel(getEffectiveLoggerLevel(entry.getValue()));
+		}
+	    }
+
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
+
+	return null;
+
+    }
+
+    private Map<String, Logger> getLoggerInstances() {
+
+	Map<String, Logger> loggers = new HashMap<String, Logger>();
+	try {
+
+	    LogManager lm = LogManager.getLogManager();
+	    Class<?> logManagerClass = lm.getClass();
+
+	    // We're only interested in the Apache JULI implementation
+	    if (!logManagerClass.getName().equals(APACHE_JULI_LOG_MANAGER_IMPL)) {
+		return loggers;
+	    }
+
+	    Field f = lm.getClass().getDeclaredField(LOG_MANAGER_CLASSLOADER_LOGGERS_FIELD);
+	    f.setAccessible(true);
+	    Map<?, ?> classLoaderLoggers = (Map<?, ?>) f.get(lm);
+	    if (classLoaderLoggers == null || classLoaderLoggers.size() == 0) {
+		return loggers;
+	    }
+
+	    Field loggersField = null;
+	    lm.getLogger("").addHandler(new StreamHandler(System.out, new Formatter() {
+
+		@Override
+		public String format(LogRecord record) {
+
+		    return record.getLevel() + " : " + record.getMillis() + " : " + record.getMessage();
+		}
+	    }));
+	    for (Entry<?, ?> entry : classLoaderLoggers.entrySet()) {
+
+		// Entry values should be instances of
+		// org.apache.juli.ClassLoaderLogManager$ClassLoaderLogInfo
+		Object classLoaderLogInfo = entry.getValue();
+		if (loggersField == null) {
+		    loggersField = classLoaderLogInfo.getClass().getDeclaredField(CLASSLOADER_LOG_INFO_LOGGERS);
+		    loggersField.setAccessible(true);
 		}
 
-		return result;
+		@SuppressWarnings("unchecked")
+		Map<String, Logger> classLoaderloggers = (Map<String, Logger>) loggersField.get(classLoaderLogInfo);
+		if (classLoaderLoggers != null) {
+		    loggers.putAll(classLoaderloggers);
+		}
+
+		// for (Entry<String, Logger> e : loggers.entrySet()) {
+		// System.out.println(e.getKey() + ": " +
+		// Arrays.asList(e.getValue().getHandlers()));
+		// System.out.println(e.getKey() + ": " +
+		// e.getValue().getUseParentHandlers());
+		// e.getValue().addHandler(new StreamHandler(System.out, new
+		// Formatter() {
+		//
+		// @Override
+		// public String format(LogRecord record) {
+		//
+		// return record.getLevel() + " : " + record.getMillis() + " : "
+		// + record.getMessage();
+		// }
+		// }));
+		// }
+
+	    }
+	} catch (Exception e) {
+	    e.printStackTrace();
 	}
+
+	return loggers;
+    }
 }
