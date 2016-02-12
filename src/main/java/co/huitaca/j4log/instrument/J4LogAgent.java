@@ -48,11 +48,11 @@ public class J4LogAgent {
 			InstanceAlreadyExistsException, MBeanRegistrationException,
 			NotCompliantMBeanException {
 
-		System.out.println("Activating j4Log agent.");
-		instrumentation.addTransformer(new Transformer(
-				buildObservedClassesMap()), false);
-		ManagementFactory.getPlatformMBeanServer().registerMBean(
-				J4Log.getInstance(), new ObjectName(J4Log.OBJECT_NAME));
+		    System.out.println("Activating j4Log agent.");
+		    instrumentation.addTransformer(new Transformer(
+		    		buildObservedClassesMap()), false);
+		    ManagementFactory.getPlatformMBeanServer().registerMBean(
+		    		J4Log.getInstance(), new ObjectName(J4Log.OBJECT_NAME));
 
 	}
 
