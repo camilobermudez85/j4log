@@ -127,6 +127,14 @@ public class ApacheJULIPlugin extends JULPlugin {
 	    e.printStackTrace();
 	}
 
+		for (Entry<String, Logger> e : loggers.entrySet()) {
+			System.out.println("[" + e.getKey()
+					+ "] : ["
+					+ (e.getValue().getParent() == null? "*****NO PAPA*******" : e.getValue().getParent().getName()) + "] : "
+					+ (e.getValue().getUseParentHandlers() ? "[GOOD SON]"
+							: "[***************BAD SON****************]"));
+		}
+	
 	return loggers;
     }
 
