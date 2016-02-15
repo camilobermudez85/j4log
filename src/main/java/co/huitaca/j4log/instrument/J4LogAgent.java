@@ -21,6 +21,7 @@ import java.lang.instrument.Instrumentation;
 import java.lang.management.ManagementFactory;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
 import co.huitaca.j4log.J4LogPlugin;
+import co.huitaca.j4log.LogLevel;
 import co.huitaca.j4log.jmx.J4Log;
 import co.huitaca.j4log.plugins.PluginManager;
 
@@ -48,7 +50,9 @@ public class J4LogAgent {
 			InstanceAlreadyExistsException, MBeanRegistrationException,
 			NotCompliantMBeanException {
 
-		    System.out.println("Activating j4Log agent.");
+		    System.out.println("Activating j4Log agent");
+		    setInitialStates(buildInitialState(agentArgument));
+		    
 		    instrumentation.addTransformer(new Transformer(
 		    		buildObservedClassesMap()), false);
 		    ManagementFactory.getPlatformMBeanServer().registerMBean(
@@ -56,6 +60,35 @@ public class J4LogAgent {
 
 	}
 
+	private static void setInitialStates(Map<String, LogLevel> initialState) {
+		System.out.println("Initial state: " + initialState);
+		for (J4LogPlugin plugin : PluginManager.getPlugins()) {
+			plugin.setInitialState(initialState);
+		}
+	}
+	
+	private static Map<String, LogLevel> buildInitialState(String agentArgument) {
+	
+		if(agentArgument == null) {
+			return Collections.emptyMap();
+		}
+		Map<String, LogLevel> initialState = new HashMap<String, LogLevel>();
+		String[] loggers = agentArgument.split(",");
+		for (String logger : loggers) {
+			String[] spl = logger.split("=");
+			if(spl.length > 1) {
+				String name = spl[0];
+				String level = spl[1];
+				try {
+					initialState.put(name, LogLevel.valueOf(level.toUpperCase()));
+				} catch (Exception e) {	
+					// it could be anything, just ignore	
+				}
+			}
+		}
+		return initialState;
+	}
+	
 	private static Map<String, List<J4LogPlugin>> buildObservedClassesMap() {
 
 		Map<String, List<J4LogPlugin>> map = new HashMap<String, List<J4LogPlugin>>();

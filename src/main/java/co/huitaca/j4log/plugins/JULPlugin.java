@@ -21,16 +21,18 @@ import java.security.ProtectionDomain;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
-import co.huitaca.j4log.J4LogPlugin;
-import co.huitaca.j4log.LogLevel;
 import javassist.ClassPool;
 import javassist.CtClass;
+import javassist.CtField;
 import javassist.CtMethod;
+import co.huitaca.j4log.J4LogPlugin;
+import co.huitaca.j4log.LogLevel;
 
 public class JULPlugin extends J4LogPlugin {
 
@@ -43,9 +45,13 @@ public class JULPlugin extends J4LogPlugin {
     private static final String JUL_LOGGER = "java.util.logging.Logger";
     private static final String JUL_LOGGER_LEVEL_VALUE_FIELD = "levelValue";
 
+    private static final String JUL_LOGGER_GET_LEVEL_METHOD_NAME;
+    private static final String JUL_LOGGER_GET_LEVEL_METHOD_DESC;
     private static final String JUL_LOGGER_ADD_HANDLER_METHOD_NAME;
     private static final String JUL_LOGGER_ADD_HANDLER_METHOD_DESC;
     private static final String JUL_LOGGER_ADD_HANDLER_AFTER_SRC;
+    private static final String JUL_LOGGER_CONSOLE_LOGGER_FLAG_DEF;
+    private static final String JUL_LOGGER_CONSOLE_LOGGER_FLAG_INIT;
     private static final String JUL_LOGGER_GET_HANDLERS_METHOD_NAME;
     private static final String JUL_LOGGER_GET_HANDLERS_METHOD_DESC;
     private static final String JUL_LOGGER_GET_HANDLERS_BEFORE_SRC;
@@ -91,28 +97,27 @@ public class JULPlugin extends J4LogPlugin {
 	JUL_LOG_LEVELS_MAP.put(Level.SEVERE.intValue(), Level.SEVERE);
 	JUL_LOG_LEVELS_MAP.put(Level.OFF.intValue(), Level.OFF);
 
+	JUL_LOGGER_GET_LEVEL_METHOD_NAME = "getLevel";
+	JUL_LOGGER_GET_LEVEL_METHOD_DESC = "()Ljava/util/logging/Level;";
 	JUL_LOGGER_ADD_HANDLER_METHOD_NAME = "addHandler";
 	JUL_LOGGER_ADD_HANDLER_METHOD_DESC = "(Ljava/util/logging/Handler;)V";
 	JUL_LOGGER_ADD_HANDLER_AFTER_SRC = "{if($1 instanceof java.util.logging.ConsoleHandler) removeHandler($1);}";
+	JUL_LOGGER_CONSOLE_LOGGER_FLAG_DEF = "private volatile boolean consoleLogger;";
+	JUL_LOGGER_CONSOLE_LOGGER_FLAG_INIT = "false;";
 	JUL_LOGGER_GET_HANDLERS_METHOD_NAME = "getHandlers";
 	JUL_LOGGER_GET_HANDLERS_METHOD_DESC = "()[Ljava/util/logging/Handler;";
 	JUL_LOGGER_GET_HANDLERS_BEFORE_SRC = 
 			"{"
-			+ "if(\"\".equals(getName())) {"
-        			+ "boolean consoleHandlerExists = false;"
-        			+ "for(int i = 0; i < handlers.size(); i++) {"
-                			+ "java.util.logging.Handler h = handlers.get(i);"
-                			+ "if(h instanceof java.util.logging.StreamHandler) {"
-                        			+ "consoleHandlerExists = true;"
-                        			+ "break;"
-                			+ "}"
+			+ "if(\"\".equals(getName()) || !getUseParentHandlers()) {"
+        		+ "if(!consoleLogger){"
+        			+ "synchronized(this) {"
+    					+ "consoleLogger = true;"
+            			+ "java.util.logging.StreamHandler sh = new java.util.logging.StreamHandler"
+            			+ "(java.lang.System.out, new java.util.logging.SimpleFormatter());"
+            			+ "sh.setLevel(java.util.logging.Level.ALL);"
+            			+ "handlers.add(sh);"
         			+ "}"
-        			+ "if(!consoleHandlerExists){"
-                			+ "java.util.logging.StreamHandler sh = new java.util.logging.StreamHandler"
-                			+ "(java.lang.System.out, new java.util.logging.SimpleFormatter());"
-                			+ "sh.setLevel(java.util.logging.Level.ALL);"
-                			+ "addHandler(sh);"
-        			+ "}"
+        		+ "}"
 			+ "}"
 			+ "};";
 
@@ -231,12 +236,43 @@ public class JULPlugin extends J4LogPlugin {
 	CtClass cl = null;
 	try {
 
+		
+//			Map<String, java.util.logging.Level> loggersLevel = new HashMap<String, java.util.logging.Level>();
+//			loggersLevel.put("javax", java.util.logging.Level.FINER);
+//			loggersLevel.put("org", java.util.logging.Level.ALL);
+//			if (loggersLevel.contains(getName())) {
+//				setLevel(loggersLevel.get(getName()));
+//			}
+
+		
 	    CtClass loggerCtClass = pool.getCtClass(JUL_LOGGER);
 	    
+	    // Transform addHandler
 	    CtMethod methodAddHandler = loggerCtClass.getMethod(JUL_LOGGER_ADD_HANDLER_METHOD_NAME,
 		    JUL_LOGGER_ADD_HANDLER_METHOD_DESC);
 	    methodAddHandler.insertAfter(JUL_LOGGER_ADD_HANDLER_AFTER_SRC);
 
+	    // Transform getLevel()
+	    CtMethod methodGetLevel = loggerCtClass.getMethod(JUL_LOGGER_GET_LEVEL_METHOD_NAME,
+			    JUL_LOGGER_GET_LEVEL_METHOD_DESC);
+	    StringBuilder sb = new StringBuilder
+	    		("Map<String, java.util.logging.Level> loggersLevel = new HashMap<String, java.util.logging.Level>();");
+	    for (Entry<String, LogLevel> e : initialState.entrySet()) {
+			sb.append("loggersLevel.put(\"")
+			.append(e.getKey())
+			.append("\",java.util.logging.Level.")
+			.append(mapLevel(e.getValue().toString()))
+			.append(");");
+		}
+	    sb.append("if(loggersLevel.contains(getName())) {setLevel(loggersLevel.get(getName()));}");
+	    System.out.println(sb.toString());
+	    methodGetLevel.insertBefore(sb.toString());				
+	    
+	    // Add consoleLogger field
+	    CtField ctField = CtField.make(JUL_LOGGER_CONSOLE_LOGGER_FLAG_DEF, loggerCtClass);
+	    loggerCtClass.addField(ctField, JUL_LOGGER_CONSOLE_LOGGER_FLAG_INIT);
+	    
+	    // Transform getHandlers
 	    System.setProperty(JUL_SIMPLE_FORMATTER_FORMAT_PROPERTY, JUL_SIMPLE_FORMATTER_FORMAT);
 	    CtMethod methodGetHandlers = loggerCtClass.getMethod(JUL_LOGGER_GET_HANDLERS_METHOD_NAME,
 		    JUL_LOGGER_GET_HANDLERS_METHOD_DESC);

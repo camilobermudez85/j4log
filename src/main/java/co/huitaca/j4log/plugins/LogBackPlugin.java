@@ -15,17 +15,10 @@
  */
 package co.huitaca.j4log.plugins;
 
-import java.lang.reflect.InvocationTargetException;
 import java.security.ProtectionDomain;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
 
 import co.huitaca.j4log.J4LogPlugin;
-import co.huitaca.j4log.LogLevel;
 
 public class LogBackPlugin extends J4LogPlugin {
 
