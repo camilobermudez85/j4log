@@ -61,7 +61,6 @@ public class J4LogAgent {
 	}
 
 	private static void setInitialStates(Map<String, LogLevel> initialState) {
-		System.out.println("Initial state: " + initialState);
 		for (J4LogPlugin plugin : PluginManager.getPlugins()) {
 			plugin.setInitialState(initialState);
 		}
@@ -94,7 +93,6 @@ public class J4LogAgent {
 		Map<String, List<J4LogPlugin>> map = new HashMap<String, List<J4LogPlugin>>();
 		for (J4LogPlugin plugin : PluginManager.getPlugins()) {
 
-			System.out.println("Loading plugin " + plugin);
 			for (String className : plugin.getObservedClasses()) {
 				if (className == null || "".equals(className.trim())) {
 					continue;

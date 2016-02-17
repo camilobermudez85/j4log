@@ -22,67 +22,91 @@ import java.util.TreeMap;
 
 public abstract class J4LogPlugin {
 
-	protected Map<String, LogLevel> initialState;
+    protected Map<String, LogLevel> initialState;
 
-	public abstract int countLoggers();
+    public int countLoggers() {
+	return getLoggers().size();
+    }
 
-	public abstract Map<String, String> getLoggers();
+    public abstract Map<String, String> getLoggers();
 
-	public abstract int countLoggersLike(String like);
+    public int countLoggersLike(String like) {
+	return filterLike(getLoggers(), like).size();
+    }
 
-	public abstract Map<String, String> getLoggersLike(String like);
+    public Map<String, String> getLoggersLike(String like) {
+	return filterLike(getLoggers(), like);
+    }
 
-	public abstract void setLevel(String logger, String level);
+    public abstract void setLevel(String logger, String level);
 
-	public abstract String getLevel(String logger);
+    public abstract String getLevel(String logger);
 
-	public abstract boolean contains(String logger);
+    public abstract boolean contains(String logger);
 
-	/**
-	 * *** ONLY USED IN AGENT MODE ***
-	 * 
-	 * The implementation should return the names of the classes it's interested
-	 * in. When any of the classes returned here gets loaded the plug-in
-	 * implementation will get notified on the method
-	 * {@link #onClassLoaded(String, ClassLoader, ProtectionDomain, byte[])}.
-	 * 
-	 * @return a list of classes fully qualified names, e.g.
-	 *         {"java.lang.List","java.lang.String"}
-	 */
-	public abstract String[] getObservedClasses();
+    /**
+     * *** ONLY USED IN AGENT MODE ***
+     * 
+     * The implementation should return the names of the classes it's interested
+     * in. When any of the classes returned here gets loaded the plug-in
+     * implementation will get notified on the method
+     * {@link #onClassLoaded(String, ClassLoader, ProtectionDomain, byte[])}.
+     * 
+     * @return a list of classes fully qualified names, e.g.
+     *         {"java.lang.List","java.lang.String"}
+     */
+    public abstract String[] getObservedClasses();
 
-	/**
-	 * *** ONLY USED IN AGENT MODE ***
-	 * 
-	 * Through this method, the implementation will get notified about the
-	 * loading events of any of the classes returned on
-	 * {@link #getObservedClasses()}.
-	 * 
-	 * @param className
-	 * @param classLoader
-	 */
-	public abstract byte[] onClassLoaded(String className,
-			ClassLoader classLoader, ProtectionDomain protectionDomain,
-			byte[] classfileBuffer);
+    /**
+     * *** ONLY USED IN AGENT MODE ***
+     * 
+     * Through this method, the implementation will get notified about the
+     * loading events of any of the classes returned on
+     * {@link #getObservedClasses()}.
+     * 
+     * @param className
+     * @param classLoader
+     */
+    public abstract byte[] onClassLoaded(String className, ClassLoader classLoader, ProtectionDomain protectionDomain,
+	    byte[] classfileBuffer);
 
-	public void setInitialState(Map<String, LogLevel> initialState) {
-		this.initialState = initialState;
+    public void setInitialState(Map<String, LogLevel> initialState) {
+	this.initialState = initialState;
+    }
+    
+    public Map<String, String> getSubtree(String root) {
+	return filterStartsWith(getLoggers(), root);
+    }
+
+    protected Map<String, String> filterLike(Map<String, String> input, String like) {
+
+	if (like == null || "".equals(like.trim())) {
+	    return input;
 	}
 
-	protected Map<String, String> filterLike(Map<String, String> input,
-			String like) {
-
-		if (like == null || "".equals(like.trim())) {
-			return input;
-		}
-
-		Map<String, String> filtered = new TreeMap<>();
-		for (Entry<String, String> entry : input.entrySet()) {
-			if (entry.getKey().toLowerCase().contains(like.toLowerCase())) {
-				filtered.put(entry.getKey(), entry.getValue());
-			}
-		}
-
-		return filtered;
+	Map<String, String> filtered = new TreeMap<>();
+	for (Entry<String, String> entry : input.entrySet()) {
+	    if (entry.getKey().toLowerCase().contains(like.toLowerCase())) {
+		filtered.put(entry.getKey(), entry.getValue());
+	    }
 	}
+
+	return filtered;
+    }
+
+    protected Map<String, String> filterStartsWith(Map<String, String> input, String s) {
+
+	if (s == null || "".equals(s.trim())) {
+	    return input;
+	}
+
+	Map<String, String> filtered = new TreeMap<>();
+	for (Entry<String, String> entry : input.entrySet()) {
+	    if (entry.getKey().startsWith(s)) {
+		filtered.put(entry.getKey(), entry.getValue());
+	    }
+	}
+
+	return filtered;
+    }
 }

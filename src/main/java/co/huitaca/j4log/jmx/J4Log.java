@@ -102,9 +102,13 @@ public class J4Log implements J4LogMBean {
     @Override
     public void setLevel(String logger, String level) {
 
+	System.out.println("setLevel: " + level);
 	for (J4LogPlugin plugin : PluginManager.getPlugins()) {
-	    if (plugin.contains(logger)) {
-		plugin.setLevel(logger, level);
+	    System.out.println("Plugin: " + plugin);
+	    System.out.println("Subtree: " + plugin.getSubtree(logger));
+	    for (Entry<String, String> e : plugin.getSubtree(logger).entrySet()) {
+		System.out.println("logger: " + e.getKey());
+		plugin.setLevel(e.getKey(), level);
 	    }
 	}
     }
