@@ -110,7 +110,7 @@ public class JULPlugin extends J4LogPlugin {
 	JUL_LOGGER_GET_LEVEL_METHOD_DESC = "()Ljava/util/logging/Level;";
 	JUL_LOGGER_ADD_HANDLER_METHOD_NAME = "addHandler";
 	JUL_LOGGER_ADD_HANDLER_METHOD_DESC = "(Ljava/util/logging/Handler;)V";
-	JUL_LOGGER_ADD_HANDLER_AFTER_SRC = "{removeHandler($1);setUseParentHandlers(true);}";
+	JUL_LOGGER_ADD_HANDLER_AFTER_SRC = "{if(!\"\".equals(name)) {removeHandler($1);setUseParentHandlers(true);}}";
 	JUL_LOGGER_CONSOLE_LOGGER_FLAG_NAME = "consoleLogger";
 	JUL_LOGGER_CONSOLE_LOGGER_FLAG_DEF = "private volatile boolean " + JUL_LOGGER_CONSOLE_LOGGER_FLAG_NAME + ";";
 	JUL_LOGGER_CONSOLE_LOGGER_FLAG_INIT = "false;";
@@ -121,7 +121,7 @@ public class JULPlugin extends J4LogPlugin {
 	JUL_LOGGER_GET_HANDLERS_METHOD_DESC = "()[Ljava/util/logging/Handler;";
 	JUL_LOGGER_GET_HANDLERS_BEFORE_SRC = 
 			"{"
-			+ "if(\"\".equals(getName())) {"
+			+ "if(\"\".equals(name)) {"
         		+ "if(!this." + JUL_LOGGER_CONSOLE_LOGGER_FLAG_NAME + "){"
     				+ "this." + JUL_LOGGER_CONSOLE_LOGGER_FLAG_NAME + " = true;"
             			+ StreamHandler.class.getName() + " sh = new java.util.logging.StreamHandler"

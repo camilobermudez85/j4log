@@ -16,6 +16,7 @@
 package co.huitaca.j4log.plugins;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -127,6 +128,12 @@ public class ApacheJULIPlugin extends JULPlugin {
 	    e.printStackTrace();
 	}
 
+		for (Entry<String, Logger> e : loggers.entrySet()) {
+//		    if(e.getValue().getHandlers().length > 0) {
+//			System.out.println(e.getKey() + " : " + Arrays.asList(e.getValue().getHandlers()));
+//		    }
+		}
+	
 	return loggers;
     }
 
